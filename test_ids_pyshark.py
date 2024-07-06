@@ -44,7 +44,7 @@ def pcapInfoToListBy2Filters(filename, filter1, filter2):
     return csvlist
                         
 def test():
-    file_list=['E:/Log_20240618_092153/logs/sctp2','E:/Log_20240618_092153/logs/sctp0_2024-06-18-09-21-25.pcap.gz','E:/Log_20240618_092153/logs/sctp1_2024-06-18-09-21-43.pcap.gz','E:/Log_20240618_092153/logs/sctp2_2024-06-18-09-21-04.pcap.gz']
+    #file_list=['E:/Log_20240618_092153/logs/sctp2','E:/Log_20240618_092153/logs/sctp0_2024-06-18-09-21-25.pcap.gz','E:/Log_20240618_092153/logs/sctp1_2024-06-18-09-21-43.pcap.gz','E:/Log_20240618_092153/logs/sctp2_2024-06-18-09-21-04.pcap.gz']
     csvwriter.writerow(['filename/packet number','time','source IP','destination IP','protocol','summary info','MME-ID','ENB-ID'])
     for filename in file_list:
         csvwriter.writerow([os.path.basename(filename),'','','','','','',''])

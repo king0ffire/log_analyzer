@@ -1,12 +1,5 @@
 import gzip
-import glob
 import re
-import csv
-import os
-
-log_name="Log_20240618_092153"
-base_path="E:/"+log_name+"/logs/trace/trace"
-path_list=glob.glob(base_path+"/dbglog*")
 
 def patterninfile(file,pattern):
     extracted=re.findall(pattern,file)
@@ -24,45 +17,32 @@ def namesTocountermap(formatedNames):
             map[item] = 1
     return map
 
-fourEqualPattern = r"====[^\[]*"
-fiveDashPattern = r"-{5,}[^-\[\n]*"
-formatedNames = []
-for fileitem in path_list:
-    if(fileitem[-3:]=='.gz'):
-        with gzip.open(fileitem) as f:
-            info = f.read().decode("utf-8")
-            extractedfourEqualPattern = patterninfilebyline(info, fourEqualPattern)
-            extractedfiveDashPattern = patterninfilebyline(info, fiveDashPattern)
-            for i in range(len(extractedfourEqualPattern)):
-                currentname=extractedfourEqualPattern[i].split(" ",1)[1].strip()
-                if currentname!='':
-                    formatedNames.append(currentname)
-            for i in range(len(extractedfiveDashPattern)):
-                currentname=extractedfiveDashPattern[i].split(" ", 1)
-                if len(currentname)<=1: #面向结果编程
-                    continue
-                currentname=currentname[1].strip()
-                if  currentname!= '':
-                    formatedNames.append(currentname)
-                if currentname=="18 09:20:49 info":
-                    print("error")
+def process_one_file_by2patterns(formatedNames,fileinfo,pattern1,pattern2):
+    extractedfourEqualPattern = patterninfilebyline(fileinfo, pattern1)
+    extractedfiveDashPattern = patterninfilebyline(fileinfo, pattern2)
+    for i in range(len(extractedfourEqualPattern)):
+        currentname=extractedfourEqualPattern[i].split(" ",1)[1].strip()
+        if currentname!='':
+            formatedNames.append(currentname)
+    for i in range(len(extractedfiveDashPattern)):
+        currentname=extractedfiveDashPattern[i].split(" ", 1)
+        if len(currentname)<=1: #面向结果编程
+            continue
+        currentname=currentname[1].strip()
+        if  currentname!= '':
+            formatedNames.append(currentname)
+    return formatedNames
 
-    elif (fileitem[-4:]!='.csv'):
-        with open(fileitem) as f:
-            info=f.read()
-            extractedfourEqualPattern=patterninfilebyline(info,fourEqualPattern)
-            extractedfiveDashPattern=patterninfilebyline(info,fiveDashPattern)
-            for i in range(len(extractedfourEqualPattern)):
-                currentname=extractedfourEqualPattern[i].split(" ",1)[1].strip()
-                if currentname!='':
-                    formatedNames.append(currentname)
-            for i in range(len(extractedfiveDashPattern)):
-                currentname=extractedfiveDashPattern[i].split(" ",1)[1].strip()
-                if currentname!='':
-                    formatedNames.append(currentname)
-
-countermap=namesTocountermap(formatedNames)
-with open(os.path.join( base_path,log_name)+".csv","w",newline='') as csvfile:
-    csvwriter=csv.writer(csvfile)
-    for (key,value) in countermap.items():
-        csvwriter.writerow([key,value])
+def counter_FileListby2patterns(path_list,pattern1,pattern2):
+    formatedNames = []
+    for fileitem in path_list:
+        if(fileitem[-3:]=='.gz'):
+            with gzip.open(fileitem) as f:
+                info = f.read().decode("utf-8")
+                process_one_file_by2patterns(formatedNames,info,pattern1,pattern2)
+        elif (fileitem[-4:]!='.csv'):
+            with open(fileitem) as f:
+                info=f.read()
+                process_one_file_by2patterns(formatedNames,info,pattern1,pattern2)
+    countermap=namesTocountermap(formatedNames)
+    return countermap
