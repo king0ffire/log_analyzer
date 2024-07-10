@@ -6,11 +6,12 @@ import csv
 import glob
 import gzip
 import cProfile
+import sys
 
-def run():
+def run(filelocation):
     filter1='s1ap.MME_UE_S1AP_ID'
     filter2='s1ap.ENB_UE_S1AP_ID'
-    filelocation=r"E:/Log_20240618_092153.tar.gz"
+    #filelocation=r"E:/temptest/Log_20240618_092153.tar.gz"
     basedir=os.path.dirname(filelocation)
     extracteddir=os.path.splitext(os.path.splitext(filelocation)[0])[0]
     if not os.path.exists(extracteddir):
@@ -29,34 +30,39 @@ def run():
     csvfile_dbg=open(os.path.join(extracteddir,"dbg.csv"),"w",newline='')
     csvwriter_dbg=csv.writer(csvfile_dbg)
     sctp_file_list=glob.glob(os.path.dirname(tracelocation)+"/sctp*")
+    print(len(sctp_file_list))
+    sys.stdout.flush()
     dbg_file_list=glob.glob(dbglogsdir+"/dbglog*")
     cache_path=os.path.join(extracteddir,'cache')
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
     
-    print("dbg start!")
+    #print("dbg start!")
     fourEqualPattern = r"====[^\[]*"
     fiveDashPattern = r"-{5,}[^-\[\n]*"
+    csvwriter_dbg.writerow(['Event Name','Counts'])
     countmap=counter_FileListby2patterns(dbg_file_list,fourEqualPattern,fiveDashPattern)
     for (key,value) in countmap.items():
         csvwriter_dbg.writerow([key,value])
     csvfile_dbg.close()
-    print("dbg finished")
+    #print("dbg finished")
     
     
-    print("sctp start!")
-    csvwriter_id.writerow(['filename/packet number','time','source IP','destination IP','protocol','summary info','MME-ID','ENB-ID'])
+    #print("sctp start!")
+    csvwriter_id.writerow(['Filename','Packet Number','Time','Source IP','Destination IP','Protocol','Summary Info','MME-ID','ENB-ID'])
     for i,filename in enumerate(sctp_file_list):
-        csvwriter_id.writerow([os.path.basename(filename),'','','','','','',''])
         if filename[-3:]=='.gz':
             with gzip.open(filename) as f:
                     with open(os.path.join(cache_path,os.path.splitext(os.path.basename(filename))[0]),'wb') as f2:
                         f2.write(f.read())
                         sctp_file_list[i]=f2.name
     for filename in sctp_file_list:
+        #csvwriter_id.writerow([os.path.basename(filename),'','','','','','',''])
         process_one_file_by2filters(csvwriter_id,filename,filter1,filter2)
         csvfile_id.flush()
-    print("sctp finished")
+        print("sctp_finished_one")
+        sys.stdout.flush()
+    #print("sctp finished")
 
 if __name__ == '__main__':
-    cProfile.run('run()')
+    run(sys.argv[1])

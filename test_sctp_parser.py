@@ -14,8 +14,6 @@ for filename in file_list:
     if(filename[-3:]=='.gz'):
         with gzip.open(filename) as f:
             pkts=rdpcap(f)
-            for pkt in pkts:
-                arrivaltime=pkt.time
-                destip=pkt['IP'].dst
-                srcip=pkt['IP'].src
+            pkt=pkts[10]
+            pkt
 
