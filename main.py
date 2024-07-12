@@ -49,7 +49,7 @@ def run(filelocation):
     
     
     #print("sctp start!")
-    csvwriter_id.writerow(['Filename','Packet Number','Time','Source IP','Destination IP','Protocol','Summary Info','MME-ID','ENB-ID'])
+    csvwriter_id.writerow(['Filename','Pkt Num','Time','Source IP','Destination IP','Protocol','Summary Info','MME-ID','ENB-ID'])
     for i,filename in enumerate(sctp_file_list):
         if filename[-3:]=='.gz':
             with gzip.open(filename) as f:
