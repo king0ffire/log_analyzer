@@ -21,9 +21,35 @@ def mapget(map, key):
         return 0
 
 
+
 debug = True
 
+#暂时不用
+'''
+def CategoryCount():
+    categoriescount = {}
+    for categoryname, eventlist in categories.items():
+            categoriescount[categoryname] = 0
+            for event in eventlist:
+                categoriescount[categoryname] += mapget(countmap, event)
+    csvwriter_acc.writerow(["事件总数", eventsum])
+    csvwriter_acc.writerow(["UE接入", categoriescount["UE接入"]])
+    csvwriter_acc.writerow(["S1切换入", categoriescount["S1切换入"]])
+    csvwriter_acc.writerow(["S1切换出", categoriescount["S1切换出"]])
+    csvwriter_acc.writerow(["未分类", other])
+'''    
+    
 
+def get_tag(countmap, categories):
+    tags = {}
+    for key in countmap.keys():
+        tags[key]=[]
+    
+    for key, categorylist in categories.items():
+        for category in categorylist:
+                tags[category].append(key)
+                
+    return tags
 # mode 0 is single thread， mode 1 is multithread
 def run(filelocation, mode=0):
     filter1 = "s1ap.MME_UE_S1AP_ID"
@@ -57,9 +83,9 @@ def run(filelocation, mode=0):
     with tarfile.open(tracelocation, "r:gz") as tar:
         tar.extractall(path=traceextraceteddir)
     dbglogsdir = os.path.join(traceextraceteddir, "trace")
-    csvfile_id = open(os.path.join(extracteddir, "ids.csv"), "w", newline="")
+    csvfile_id = open(os.path.join(extracteddir, "ids.csv",), "w", newline="",encoding="utf-8")
     csvwriter_id = csv.writer(csvfile_id)
-    csvfile_dbg = open(os.path.join(extracteddir, "dbg.csv"), "w", newline="")
+    csvfile_dbg = open(os.path.join(extracteddir, "dbg.csv"), "w", newline="",encoding="utf-8")
     csvwriter_dbg = csv.writer(csvfile_dbg)
     sctp_file_list = glob.glob(os.path.dirname(tracelocation) + "/sctp*")
 
@@ -68,41 +94,31 @@ def run(filelocation, mode=0):
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
 
-    tags = get_category(os.path.join(os.path.dirname(sys.argv[0]), "dbg信令分类.xlsx"))
     logger.info("start dbg")
     fourEqualPattern = r"====[^\[]*"
     fiveDashPattern = r"-{5,}[^-\[\n]*"
     pattern1 = r"[X2AP]:Sending UE CONTEXT RELEASE"
     pattern2 = r"Received HANDOVER REQUEST"
-    csvwriter_dbg.writerow(["Event Name", "Counts", "Category"])
+    csvwriter_dbg.writerow(["Event Name", "Counts", "Tags"])
     countmap = counter_FileListby2patterns(
         dbg_file_list, fourEqualPattern, fiveDashPattern
     )
 
-    category = {}
-    for key, valuelist in tags.items():
-        for value in valuelist:
-            if value in category:
-                category[value].append(key)
-            else:
-                category[value] = [key]
+    categories = get_category(os.path.join(os.path.dirname(sys.argv[0]), "dbg信令分类.xlsx"))
+    tags=get_tag(countmap, categories)
 
-    eventsum = 0
-    other = 0
     for key, value in countmap.items():
-        eventsum += value
-        if key in category:
-            csvwriter_dbg.writerow([key, value, category[key]])
-        else:
-            csvwriter_dbg.writerow([key, value, "Other"])
-            other += value
+        if len(tags[key]) == 0:
+            tags[key].append("未分类")
+        csvwriter_dbg.writerow([key, value, tags[key]])
+
     csvfile_dbg.close()
     logger.info("dbg finished")
 
-    tagscount = {}
+
     listofpattern1 = len(ParseFiles(dbg_file_list, pattern1))
     listofpattern2 = len(ParseFiles(dbg_file_list, pattern2))
-    with open(os.path.join(extracteddir, "accounting.csv"), "w", newline="") as f:
+    with open(os.path.join(extracteddir, "accounting.csv"), "w", newline="",encoding="utf-8") as f:
         csvwriter_acc = csv.writer(f)
 
         csvwriter_acc.writerow(
@@ -130,17 +146,6 @@ def run(filelocation, mode=0):
             ]
         )
 
-        for key, valuelist in tags.items():
-
-            tagscount[key] = 0
-            for value in valuelist:
-                tagscount[key] += mapget(countmap, value)
-                eventsum += 0
-        csvwriter_acc.writerow(["事件总数", eventsum])
-        csvwriter_acc.writerow(["UE接入", tagscount["UE接入"]])
-        csvwriter_acc.writerow(["S1切换入", tagscount["S1切换入"]])
-        csvwriter_acc.writerow(["S1切换出", tagscount["S1切换出"]])
-        csvwriter_acc.writerow(["其他", other])
 
     logger.info("accounting finished")
 
