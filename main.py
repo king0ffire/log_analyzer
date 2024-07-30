@@ -8,11 +8,12 @@ import tarfile
 import csv
 import glob
 import gzip
-import cProfile
 import sys
 import shutil
 import logging
+import cProfile
 
+from dbcount import ParseFiles_tosql_multithread
 
 def mapget(map, key):
     if key in map:
@@ -40,23 +41,15 @@ def CategoryCount():
 '''    
     
 
-def get_tag(countmap, categories):
-    tags = {}
-    for key in countmap.keys():
-        tags[key]=[]
-    
-    for key, categorylist in categories.items():
-        for category in categorylist:
-                tags[category].append(key)
-                
-    return tags
 # mode 0 is single thread， mode 1 is multithread
+
 def run(filelocation, mode=0):
     filter1 = "s1ap.MME_UE_S1AP_ID"
     filter2 = "s1ap.ENB_UE_S1AP_ID"
     basedir = os.path.dirname(filelocation)
 
     extracteddir = os.path.splitext(os.path.splitext(filelocation)[0])[0]
+    fileuid=os.path.basename(extracteddir)
     if not os.path.exists(extracteddir):
         os.makedirs(extracteddir)
     with tarfile.open(filelocation, "r:gz") as tar:
@@ -65,9 +58,13 @@ def run(filelocation, mode=0):
     queue_listener = configure_logger(extracteddir)
     queue_listener.start()
     from ids_pyshark import pcapInfoToListBy2Filters, process_one_file_by2filters
-    from dbcount import counter_FileListby2patterns, ParseFiles
-    from category import get_category
-
+    from dbcount import counter_FileListby2patterns, ParseFiles, ParseFiles_tosql
+    from category import get_category,get_tag
+    import sql
+    executor=ThreadPoolExecutor() 
+    executor.submit(sql.init(fileuid))
+        
+    
     logger = logging.getLogger(__name__)
     logger.info("start logger")
     logger.info("Current Working Directory: %s", os.getcwd())
@@ -96,13 +93,39 @@ def run(filelocation, mode=0):
 
     logger.info("start dbg")
     fourEqualPattern = r"====[^\[]*"
-    fiveDashPattern = r"-{5,}[^-\[\n]*"
+    fiveDashPattern = r"-----[^-\[\n]+"
     pattern1 = r"[X2AP]:Sending UE CONTEXT RELEASE"
     pattern2 = r"Received HANDOVER REQUEST"
     csvwriter_dbg.writerow(["Event Name", "Counts", "Tags"])
     countmap = counter_FileListby2patterns(
         dbg_file_list, fourEqualPattern, fiveDashPattern
     )
+
+    #db
+    executor.shutdown(wait=True)
+    executor=None
+    logger.info("inserting into database")
+    cursor=sql.mydb.cursor()
+    sqlsentence=f"insert into dbgitems_{fileuid} values (null,%s,%s,%s,%s,%s,'{fileuid}')"
+    with ThreadPoolExecutor() as executor:
+            fs = [
+                executor.submit(
+                    ParseFiles_tosql_multithread,
+                    dbg_file_list,
+                    fourEqualPattern,
+                )
+                ,
+                executor.submit(
+                    ParseFiles_tosql_multithread,
+                    dbg_file_list,
+                    fiveDashPattern,
+                )
+            ]
+            for future in as_completed(fs):
+                cursor.executemany(sqlsentence,future.result())
+    sql.mydb.commit()
+    logger.info("inserted into database")
+    
 
     categories = get_category(os.path.join(os.path.dirname(sys.argv[0]), "dbg信令分类.xlsx"))
     tags=get_tag(countmap, categories)
@@ -185,7 +208,7 @@ def run(filelocation, mode=0):
             sys.stdout.flush()
 
     elif mode == 1:
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor() as executor:
             fs = [
                 executor.submit(
                     pcapInfoToListBy2Filters,
@@ -232,5 +255,5 @@ def configure_logger(location):
 
 
 if __name__ == "__main__":
-
     run(sys.argv[1], mode=int(sys.argv[2]))
+
