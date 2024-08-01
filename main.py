@@ -167,8 +167,9 @@ def run(filelocation, mode=0):
     pattern2 = r"Received HANDOVER REQUEST"
     
     executor_1 = ThreadPoolExecutor()
-    executor_1.submit(sctpanalysis, csvfile_id, csvwriter_id, sctp_file_list, cache_path, filter1,filter2,mode)
-
+    future=executor_1.submit(sctpanalysis, csvfile_id, csvwriter_id, sctp_file_list, cache_path, filter1,filter2,mode)
+    logger.info("future running: %s"%future.running())
+    
     #countmap = counter_FileListby2patterns(dbg_file_list, fourEqualPattern, fiveDashPattern)
     #db
     #单独的线程-1
