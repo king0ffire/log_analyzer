@@ -1,3 +1,4 @@
+from datetime import datetime
 from pyshark.capture.capture import TSharkCrashException
 import pyshark
 from os.path import basename
@@ -15,7 +16,7 @@ def pcapInfoToListBy2Filters(filename, filter1, filter2, eventloop=None):
                     #capdetail.load_packets()
                     #capsummary.load_packets()
                     for packetsummary, packetdetail in zip(capsummary, capdetail): 
-                            csvlist.append([basename(filename),packetsummary.no,packetdetail.sniff_timestamp,
+                            csvlist.append([basename(filename),packetsummary.no,datetime.fromtimestamp(float(packetdetail.sniff_timestamp)),
                                             packetsummary.source,packetsummary.destination,
                                             packetsummary.protocol,packetsummary.info,
                                             packetdetail.s1ap.get_field(field1.upper()),
