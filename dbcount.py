@@ -150,7 +150,7 @@ def ParseFiles_tosql(path_list, pattern):
 
 def lineswithpattern_patternlist(fileinfo, patternlist,countonlylist):
     formatedItems=[]
-    countonlylist=[0 for i in range(len(countonlylist))]
+    countonly=[0 for i in range(len(countonlylist))]
     for line in fileinfo:
         for pattern in patternlist:
             matchobj=patterninline(line, pattern)
@@ -170,12 +170,12 @@ def lineswithpattern_patternlist(fileinfo, patternlist,countonlylist):
                 eventname = eventname[1].strip()
                 if eventname != "":
                         formatedItems.append((date, errortype, device, info, eventname))
-        for i in range(len(countonlylist)):
-            matchobj=patterninline(line, pattern)
+        for i in range(len(countonly)):
+            matchobj=patterninline(line, countonlylist[i])
             if matchobj:
-                countonlylist[i]+=1
+                countonly[i]+=1
             
-    return formatedItems,countonlylist
+    return formatedItems,countonly
 
 
 

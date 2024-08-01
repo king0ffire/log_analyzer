@@ -37,7 +37,7 @@ def CategoryCount():
     csvwriter_acc.writerow(["S1切换出", categoriescount["S1切换出"]])
     csvwriter_acc.writerow(["未分类", other])
 '''    
-@profile
+
 def sctpanalysis(csvfile_id,csvwriter_id, sctp_file_list,cache_path,filter1,filter2, mode=0):
     from ids_pyshark import pcapInfoToListBy2Filters, process_one_file_by2filters
     logger=logging.getLogger(__name__)
@@ -110,7 +110,7 @@ def sctpanalysis(csvfile_id,csvwriter_id, sctp_file_list,cache_path,filter1,filt
         print("multithread success")
     logger.info("sctp finished")
 
-@profile
+
 # mode 0 is single thread， mode 1 is multithread
 def run(filelocation, mode=0):
     filter1 = "s1ap.MME_UE_S1AP_ID"
@@ -201,6 +201,7 @@ def run(filelocation, mode=0):
     csvfile_dbg.close()
     executor.shutdown(wait=True)
     executor=None
+    sql.mydb.commit()
     logger.info("dbg finished")
 
 
