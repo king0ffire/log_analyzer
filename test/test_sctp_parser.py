@@ -13,7 +13,7 @@ csvwriter=csv.writer(csvfile)
 for filename in file_list:
     if(filename[-3:]=='.gz'):
         with gzip.open(filename) as f:
-            pkts=rdpcap(f)
+            pkts=rdpcap(f,12)
             pkt=pkts[10]
-            pkt
+            print(pkt)
 

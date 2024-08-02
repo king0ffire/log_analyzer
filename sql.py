@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 
 
 mydb=None
-def init(fileuid):
+def init():
     global mydb
     mydb = mysql.connector.connect(host="localhost", user="root", password="root123",port="3306")
 
@@ -15,8 +15,7 @@ def init(fileuid):
     #cursor.execute("CREATE DATABASE webapp")
     cursor.execute("use webapp")
     logger.info("connection created")
-    createtable(fileuid)
-    mydb.commit()
+
 
 def createtable(fileuid):
     global mydb
@@ -25,5 +24,5 @@ def createtable(fileuid):
                    device VARCHAR(255), info VARCHAR(511), event VARCHAR(255), fileid VARCHAR(255), \
                        foreign key (fileid) references fileinfo(fileid) on delete cascade )" % fileuid
     )
-    
+    mydb.commit()
     logger.info("file table created")
