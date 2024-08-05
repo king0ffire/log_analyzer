@@ -1,3 +1,5 @@
+#负责解压文件并分析dbglog文件
+
 from concurrent.futures import ThreadPoolExecutor, as_completed, ProcessPoolExecutor
 import logging.handlers
 import queue
@@ -10,11 +12,6 @@ import sys
 import logging
 import cProfile
 
-def mapget(map, key):
-    if key in map:
-        return map[key]
-    else:
-        return 0
 
 # mode 0 is single thread， mode 1 is multithread
 def run(filelocation, mode=0):
@@ -28,7 +25,8 @@ def run(filelocation, mode=0):
     queue_listener = configure_logger(extracteddir)
     queue_listener.start()
 
-    from util import Parsefilelist
+    from util import Parsefilelist,mapget
+    from dbcount import constructdbgcsv
     import sql
     def sqlinit(fileuid):
         sql.init()
@@ -77,23 +75,18 @@ def run(filelocation, mode=0):
     executor.submit(cursor.executemany,sqlsentence,formatteditems)
     
     #单独的线程- 2<-1
-    from category import get_category,get_tag
+    from category import get_tagfromcsv
     countmap=Counter([tup[4] for tup in formatteditems])
-    categories = get_category(os.path.join(os.path.dirname(sys.argv[0]), "./dbg信令分类_唯一分类.xlsx"))
-    tags=get_tag(countmap, categories)
+    #categories = get_category(os.path.join(os.path.dirname(sys.argv[0]), r"dbg信令分类_唯一分类.xlsx"))
+    tags=get_tagfromcsv(os.path.join(os.path.dirname(sys.argv[0]), r"dbg信令分类_唯一分类.csv")) # not including non-categorized
     
-    dbgfileinfo=[["Event Name", "Counts", "Tags"]]
-    for key, value in countmap.items():
-        if len(tags[key]) == 0:
-            tags[key].append("未分类")
-        dbgfileinfo.append([key, value, tags[key]])
+    dbgfileinfo=constructdbgcsv(countmap,tags)
     csvwriter_dbg.writerows(dbgfileinfo)
     csvfile_dbg.close()
     executor.shutdown(wait=True)
     executor=None
     sql.mydb.commit()
     logger.info("dbg finished")
-
 
     listofpattern1 = countlist[0]
     listofpattern2 = countlist[1]
@@ -128,9 +121,7 @@ def run(filelocation, mode=0):
     logger.info("accounting finished")
 
     print("dbg analysis success")
-    sys.stdout.flush()
 
-    logger.info("remove cache")
     queue_listener.stop()
 
 

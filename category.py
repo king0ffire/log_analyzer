@@ -1,6 +1,6 @@
 from pandas import read_excel
 import csv
-def get_category(filelocation):
+def get_category(filelocation): #[categoryname]: list[eventname]
     dfs = read_excel(filelocation,sheet_name=None)
     category={}
     for key in dfs.keys():
@@ -18,10 +18,15 @@ def get_tag(countmap, categories):
                 tags[category].append(key)
     return tags
 
-def get_categoryfromcsv(filelocation):
-    dfs = read_excel(filelocation,sheet_name=None)
-    category={}
-    for key in dfs.keys():
-        category[key]=dfs[key]['Event Name'].tolist()
-    
-    return category
+def get_tagfromcsv(filelocation):
+    tags={}
+    with open(filelocation, 'r',encoding='utf-8') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            if row[0]=='Event Name':
+                continue
+            if row[0] in tags:
+                tags[row[0]].append(row[1])
+            else:
+                tags[row[0]]=[row[1]]
+    return tags

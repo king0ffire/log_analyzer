@@ -4,6 +4,11 @@ import io
 
 import dbcount
 
+def mapget(map, key):
+    if key in map:
+        return map[key]
+    else:
+        return 0
 
 def filenametolineiterable(file): #return : first is objects opened, second is the iterator
     objlist=[]

@@ -201,3 +201,12 @@ def ParseFiles_tosql_multithread_patternlist(path_list, patternlist):
     for obj in objlist:
         obj.close()
     return formatedItems
+
+
+def constructdbgcsv(countmap,tags):
+    dbgfileinfo=[["Event Name", "Counts", "Tags"]]
+    for key, value in countmap.items():
+        if key not in tags:
+            tags[key]=['未分类']
+        dbgfileinfo.append([key, value, tags[key]])
+    return dbgfileinfo

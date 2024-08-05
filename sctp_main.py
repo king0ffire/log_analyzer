@@ -9,83 +9,6 @@ import gzip
 import sys
 import logging
 
-def mapget(map, key):
-    if key in map:
-        return map[key]
-    else:
-        return 0
-
-def sctpanalysis(csvfile_id,csvwriter_id, sctp_file_list,cache_path,filter1,filter2, mode=0):
-    from ids_pyshark import pcapInfoToListBy2Filters, process_one_file_by2filters
-    logger=logging.getLogger(__name__)
-    logger.info("sctp started")
-    csvwriter_id.writerow(
-        [
-            "Filename",
-            "Pkt Num",
-            "Time",
-            "Source IP",
-            "Destination IP",
-            "Protocol",
-            "Summary Info",
-            "MME-ID",
-            "ENB-ID",
-        ]
-    ) 
-    for i, filename in enumerate(sctp_file_list):
-        if filename[-3:] == ".gz":
-            with gzip.open(filename) as f:
-                with open(
-                    os.path.join(
-                        cache_path, os.path.splitext(os.path.basename(filename))[0]
-                    ),
-                    "wb",
-                ) as f2:
-                    f2.write(f.read())
-                    sctp_file_list[i] = f2.name
-    if mode == 0:
-        for filename in sctp_file_list:
-            # csvwriter_id.writerow([os.path.basename(filename),'','','','','','',''])
-            process_one_file_by2filters(csvwriter_id, filename, filter1, filter2)
-            csvfile_id.flush()
-            print("sctp_finished_one")
-            sys.stdout.flush()
-    elif mode == 1:
-        with ThreadPoolExecutor() as executor:
-            fs = [
-                executor.submit(
-                    pcapInfoToListBy2Filters,
-                    filename,
-                    filter1,
-                    filter2,
-                    asyncio.new_event_loop(),
-                )
-                for filename in sctp_file_list
-            ]
-            for future in as_completed(fs):
-                csvwriter_id.writerows(future.result())
-                csvfile_id.flush()
-                print("sctp_finished_one")
-                sys.stdout.flush()
-        print("multithread success")
-    elif mode == 2:
-        with ProcessPoolExecutor() as executor:
-            fs = [
-                executor.submit(
-                    pcapInfoToListBy2Filters,
-                    filename,
-                    filter1,
-                    filter2,
-                )
-                for filename in sctp_file_list
-            ]
-            for future in as_completed(fs):
-                csvwriter_id.writerows(future.result())
-                csvfile_id.flush()
-                print("sctp_finished_one")
-                sys.stdout.flush()
-        print("multithread success")
-    logger.info("sctp finished")
 
 
 # mode 0 is single thread， mode 1 is multithread
@@ -105,6 +28,7 @@ def run(filelocation, mode=0):
     logger.info("start logger")
     logger.info("Current Working Directory: %s", os.getcwd())
     logger.info("Current File Dirctory: %s", os.path.abspath("."))
+    from ids_pyshark import sctpanalysis
 
     tracelocation = os.path.join(extracteddir, "logs", "trace.tgz")
     traceextraceteddir = os.path.splitext(tracelocation)[0]
@@ -121,7 +45,7 @@ def run(filelocation, mode=0):
         os.makedirs(cache_path)
     
     print(len(sctp_file_list))
-    sctpanalysis( csvfile_id, csvwriter_id, sctp_file_list, cache_path, filter1,filter2,mode)
+    sctpanalysis(csvfile_id, csvwriter_id, sctp_file_list, cache_path, filter1,filter2,mode)
     
     queue_listener.stop()
 
