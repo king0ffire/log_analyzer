@@ -514,13 +514,11 @@ def lineswithpattern_patternlist_5(database_writer,filename, listoffour):
                             item=(" ".join(parts[:3]), parts[3], parts[4], parts[5], matchobj.group().split(" ", 1)[1].strip())
                             formatedItems.append(item)
                             batch.append(item)
-                            if len(batch)>100:
+                            if len(batch)>1000:
                                 database_writer.add_batch(batch)
-                                print(len(batch))
-                                batch.clear()
+                                batch=[] #还就那个神志不清，列表默认是拷贝引用
                 if batch:  
-                    database_writer.add_batch(batch)     
-                    print(len(batch))
+                    database_writer.add_batch(batch)
                 return formatedItems, countonly
     except KeyboardInterrupt:
         print("KeyboardInterrupt")

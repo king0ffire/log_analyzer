@@ -6,12 +6,12 @@ logger = logging.getLogger(__name__)
 
 
 class Mypool:
-    def __init__(self):
-        self.pool=queue.Queue(-1)
+    def __init__(self,pool_size=1):
+        self.pool=queue.Queue(pool_size)
         logger.info("start sql")
         config={ "host":"127.0.0.1", "port":3306, "user":"root", "password":"root123", "database":"webapp"}
         with ThreadPoolExecutor() as executor:
-            fs=[executor.submit(mysql.connector.connect,**config) for _ in range(1)]
+            fs=[executor.submit(mysql.connector.connect,**config) for _ in range(pool_size)]
             for f in as_completed(fs):
                 self.pool.put(f.result())
         logger.info("connection created")
@@ -29,11 +29,10 @@ def initpool(loop=None):
 def createtablebypool(fileuid):
     conn=pool.get_connection()
     try:
-
         conn.cursor().execute(
-            "CREATE TABLE dbgitems_%s (id int auto_increment primary key, time VARCHAR(100), errortype VARCHAR(100), \
-                    device VARCHAR(255), info VARCHAR(511), event VARCHAR(255), fileid VARCHAR(100), \
-                        foreign key (fileid) references fileinfo(fileid))" % fileuid
+            f"CREATE TABLE dbgitems_{fileuid} (id int auto_increment primary key, time VARCHAR(100), errortype VARCHAR(100), \
+                    device VARCHAR(255), info VARCHAR(511), event VARCHAR(255), fileid VARCHAR(100) default '{fileuid}', \
+                        foreign key (fileid) references fileinfo(fileid))"
         )
         conn.commit()
         logger.info("file table created")
@@ -42,3 +41,15 @@ def createtablebypool(fileuid):
     finally:
         pool.close_connection(conn)
         
+        
+def createtablebyconn(conn,fileuid):
+    try:
+        conn.cursor().execute(
+            f"CREATE TABLE dbgitems_{fileuid} (id int auto_increment primary key, time VARCHAR(100), errortype VARCHAR(100), \
+                    device VARCHAR(255), info VARCHAR(511), event VARCHAR(255), fileid VARCHAR(100) default '{fileuid}', \
+                        foreign key (fileid) references fileinfo(fileid))"
+        )
+        conn.commit()
+        logger.info("file table created")
+    except mysql.connector.errors.ProgrammingError:
+        pass

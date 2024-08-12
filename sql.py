@@ -18,7 +18,7 @@ def init():
 def initpool():
     global pool
     logger.info("start sql")
-    pool=mysql.connector.pooling.MySQLConnectionPool(pool_name="mypool",pool_size=1,host="127.0.0.1",user="root",password="root123",port="3306",database="webapp")
+    pool=mysql.connector.pooling.MySQLConnectionPool(pool_name="mypool",pool_size=6,host="127.0.0.1",user="root",password="root123",port="3306",database="webapp")
     logger.info("connection created")
 def createtable(fileuid):
         try:

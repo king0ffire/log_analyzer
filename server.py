@@ -1,48 +1,38 @@
-#负责解压文件并分析dbglog文件
-
-import asyncio
-import cProfile
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import gzip
-import logging.handlers
-import queue
 from collections import Counter
-import os
-import tarfile
+from concurrent.futures import ThreadPoolExecutor
 import csv
+from email import message
 import glob
+import gzip
+import os
+import queue
+import logging.handlers
+import socket
 import sys
-import logging
+import tarfile
+import json
+from line_profiler import profile
 
 
-def run(filelocation, mode=0):
-    extracteddir = os.path.splitext(os.path.splitext(filelocation)[0])[0]
-    fileuid=os.path.basename(extracteddir)
-    if not os.path.exists(extracteddir):
-        os.makedirs(extracteddir)
-    with tarfile.open(filelocation, "r:gz") as tar:
-        tar.extractall(path=extracteddir,filter='fully_trusted')
+from aiosql import Mypool, createtablebyconn,createtablebypool
+from util import mapget,DBWriter
+from dbcount import constructdbgcsv,Parsefilelist_4
 
-    queue_listener = configure_logger(extracteddir)
-    queue_listener.start()
-
-    from util import mapget,DBWriter
-    from dbcount import constructdbgcsv,Parsefilelist_4
-
-    def sqlinit(fileuid):
-        global aiosql
-        import aiosql
-        aiosql.initpool()
-        aiosql.createtablebypool(fileuid)
-    sqlinit(fileuid)
+@profile
+def run(filemeta, dbconn, mode=0):
+    filelocation=filemeta["filelocation"]
     logger = logging.getLogger(__name__)
     logger.info("start logger")
     logger.info("Current Working Directory: %s", os.getcwd())
     logger.info("Current File Dirctory: %s", os.path.abspath("."))
-
-
     
-    
+    extracteddir = os.path.splitext(os.path.splitext(filelocation)[0])[0]
+    fileuid=os.path.basename(extracteddir)
+    createtablebyconn(dbconn,fileuid)
+    if not os.path.exists(extracteddir):
+        os.makedirs(extracteddir)
+    with tarfile.open(filelocation, "r:gz") as tar:
+        tar.extractall(path=extracteddir,filter='fully_trusted')
     
     tracelocation = os.path.join(extracteddir, "logs", "trace.tgz")
     traceextraceteddir = os.path.splitext(tracelocation)[0]
@@ -75,35 +65,10 @@ def run(filelocation, mode=0):
     #单独的线程-1
     logger.info("start dbg")
     sqlsentence=f"insert into dbgitems_{fileuid}  values (null,%s,%s,%s,%s,%s,'{fileuid}')"
-    db_writer = DBWriter(aiosql.pool.get_connection(),sqlsentence,fileuid)
+    db_writer = DBWriter(dbconn,sqlsentence,fileuid)
     formatteditems, countlist=Parsefilelist_4(db_writer,dbg_file_list, [fourEqualPattern, fiveDashPattern],mode)
     logger.info("dbg analisis finished, dbg file wont open again")
 
-
-    #单独的线程- 2<-1
-    #cursor=sql.conn.cursor()
-    '''
-    conn = aiosql.pool.get_connection()
-    conn.cursor().executemany(sqlsentence,formatteditems)
-    conn.commit()
-    aiosql.pool.close_connection(conn)
-    '''
-    '''
-    with ThreadPoolExecutor() as executor:
-        for i in range(0,len(formatteditems),1000):
-            batch=formatteditems[i:i+1000]
-            executor.submit(batchinsert,batch)
-    '''
-    
-    '''
-    with open(os.path.join(extracteddir, "dbgitems.csv"), "w", newline="",encoding="utf-8") as file:
-        csvwriter_database = csv.writer(file)
-        csvwriter_database.writerows(formatteditems)
-    sqlsentence=f"load data infile '{os.path.abspath(extracteddir)}/dbgitems.csv' into table dbgitems_{fileuid} fields terminated by ',' enclosed by '\"' lines terminated by '\\n' (time,errortype,device,info,event) set id=null, fileid='{fileuid}';"
-    print(sqlsentence)
-    sql.conn.cursor().execute(sqlsentence)
-    sql.conn.commit()
-    '''
 
     #单独的线程- 2<-1
     from category import get_tagfromcsv
@@ -148,27 +113,48 @@ def run(filelocation, mode=0):
         )
         csvwriter_acc.writerows(accinfo)
     logger.info("accounting finished")
-    print("dbg analysis success")
-    aiosql.pool.close_connection(db_writer.close())
-    '''
-    sqltest1=f"insert into dbgitems_{fileuid} values (null,%s,%s,%s,%s,%s,'{fileuid}')"
-    sqltest2=f"insert into dbgitems_{fileuid} value (null,'fasf','afsfds','1r13r1asf','2131fasfsa','1241frgf','{fileuid}')"
-    conn=aiosql.pool.get_connection()
-    cursor=conn.cursor()
-    cursor.execute(sqltest2)
-    cursor.executemany(sqltest1,[("j1l2jk1r","hifhaf","kafhsjafka","klaghi1o","oa2fr8h1fh1")])
-    conn.commit()
-    '''
-    queue_listener.stop()
+    db_writer.close()
+    print(f"{filelocation}:dbg analysis success")
 
+def processfiledbg(clientsocket:socket.socket,dbconn,filemeta):
+    run(filemeta,dbconn,0)
+    message=json.dumps({"filelocation":filemeta["filelocation"],"function":"dbg"})
+    clientsocket.sendall(message.encode("utf-8"))
 
+def startserver(location):
+    queue_listener = configure_logger(location)
+    queue_listener.start()
+    mypool=Mypool(1)
+    conn=mypool.get_connection()
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 9091))
+    s.listen(5)
+    with ThreadPoolExecutor() as executor:
+        while True:
+            try:
+                client_socket, addr = s.accept()
+                while True:
+                    jsondata=json.loads(client_socket.recv(1024).decode())
+                    print(jsondata)
+                    if "function" in jsondata and jsondata["function"]=="dbg":
+                        if "filelocation" in jsondata and os.path.exists(jsondata["filelocation"]):
+                            executor.submit(processfiledbg,client_socket,conn,jsondata)
+                    elif "function" in jsondata and jsondata["function"]=="stop":
+                        pass
+                    elif "function" in jsondata and jsondata["function"]=="start":
+                        pass
+                    else:
+                        client_socket.send(b"{filelocation}:error")
+            except Exception as e:
+                print(e)
+                    
 def configure_logger(location):
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
 
     que = queue.Queue(-1)
     queue_handler = logging.handlers.QueueHandler(que)
-    file_handler = logging.FileHandler(os.path.join(location, "python_dbg.log"), mode="w")
+    file_handler = logging.FileHandler(os.path.join(location, "socket_server.log"), mode="w")
     queue_handler.setLevel(logging.INFO)
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(
@@ -178,8 +164,7 @@ def configure_logger(location):
     queuelistener = logging.handlers.QueueListener(que, file_handler)
     logger.addHandler(queue_handler)
     return queuelistener
-
-
+            
+            
 if __name__ == "__main__":
-    run(sys.argv[1], mode=int(sys.argv[2]))
-
+    startserver("../../")
