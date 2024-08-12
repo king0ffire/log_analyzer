@@ -1,44 +1,49 @@
-from concurrent.futures import ThreadPoolExecutor,as_completed
-import gzip
-import io
+import queue
+import threading
 
-import dbcount
 
 def mapget(map, key):
     if key in map:
         return map[key]
     else:
         return 0
+class DBWriter:
+    def __init__(self, conn,precompiledsql, batch_size=1000):
+        self.batch_size = batch_size
+        self.sql=precompiledsql
+        self.conn=conn
+        self.queue = queue.Queue(-1)
+        self.thread = threading.Thread(target=self._db_worker, daemon=True)
+        self.thread.start()
+        self.sent=0
 
-def filenametolineiterable(file): #return : first is objects opened, second is the iterator
-    objlist=[]
-    if file[-3:] == ".gz":
-        f= gzip.open(file)
-        objlist.append(f)
-        f2=io.TextIOWrapper(f,encoding='utf-8') 
-        objlist.append(f2) 
-        return [f,f2],f2
-    elif file[-4:] != ".csv":
-        f= open(file)
-        objlist.append(f)
-        info = f.readlines()
-        return [f],info
+    def _db_worker(self):
+        batch = []
+        cursor=self.conn.cursor()
+        while True:
+            data = self.queue.get()
+            if data is None:
+                break  # 接收到结束信号，退出线程
+            batch.extend(data)
+            if len(batch) >= self.batch_size:  # 当积累到足够的数据量时，进行一次批量写入
+                cursor.executemany(self.sql,batch)
+                print("batch写入",len(batch))
+                print("queue长度",self.queue.qsize())
+                batch.clear()
+        # 处理剩余的数据
+        if batch:
+            cursor.executemany(self.sql,batch)
+            print("batch写入最后",len(batch))
+    def add_data(self, data):
+        """向队列中添加数据"""
+        self.queue.put(data)
 
-def Parsefile(file,patternlist,countonlylist):
-    openedobj,fileiterator=filenametolineiterable(file)
-    formattedItems,countlist=dbcount.lineswithpattern_patternlist(fileiterator,patternlist,countonlylist)
-    for obj in openedobj:
-        obj.close()
-    return formattedItems,countlist
-    
-
-def Parsefilelist(filelist,patternlist,countonlylist):
-    formattedItems=[]
-    countlist=[0 for i in range(len(countonlylist))]
-    with ThreadPoolExecutor() as executor:
-        fs=[executor.submit(Parsefile,file,patternlist,countonlylist) for file in filelist]
-        for f in as_completed(fs):
-            formattedItems.extend(f.result()[0])
-            for i in range(len(countonlylist)):
-                countlist[i]+=f.result()[1][i]
-    return formattedItems,countlist
+    def add_batch(self,batch):
+        self.queue.put(batch)
+    def close(self):
+        """关闭数据库写入线程"""
+        self.queue.put(None)
+        self.thread.join()
+        print(self.sent)
+        self.conn.commit()
+        return self.conn

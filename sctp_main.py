@@ -45,6 +45,7 @@ def run(filelocation, mode=0):
         os.makedirs(cache_path)
     
     print(len(sctp_file_list))
+    sys.stdout.flush()
     sctpanalysis(csvfile_id, csvwriter_id, sctp_file_list, cache_path, filter1,filter2,mode)
     
     queue_listener.stop()

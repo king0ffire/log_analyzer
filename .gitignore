@@ -12,3 +12,13 @@ __pycache__/sctp_parser.cpython-312.pyc
 __pycache__/sql.cpython-312.pyc
 .idea/.gitignore
 __pycache__/util.cpython-312.pyc
+.idea/vcs.xml
+__pycache__/aiosql.cpython-311.pyc
+__pycache__/category.cpython-38.pyc
+__pycache__/category.cpython-311.pyc
+__pycache__/dbcount.cpython-38.pyc
+__pycache__/dbcount.cpython-311.pyc
+__pycache__/sql.cpython-38.pyc
+__pycache__/sql.cpython-311.pyc
+__pycache__/util.cpython-38.pyc
+__pycache__/util.cpython-311.pyc

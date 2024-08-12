@@ -1,5 +1,7 @@
-from pandas import read_excel
+
 import csv
+'''
+from pandas import read_excel
 def get_category(filelocation): #[categoryname]: list[eventname]
     dfs = read_excel(filelocation,sheet_name=None)
     category={}
@@ -17,7 +19,7 @@ def get_tag(countmap, categories):
         for category in categorylist:
                 tags[category].append(key)
     return tags
-
+'''
 def get_tagfromcsv(filelocation):
     tags={}
     with open(filelocation, 'r',encoding='utf-8') as csvfile:
