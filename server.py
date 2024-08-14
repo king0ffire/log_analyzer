@@ -14,7 +14,7 @@ import json
 from line_profiler import profile
 
 
-from aiosql import Mypool, createtablebyconn,createtablebypool
+from aiosql import Mypool, createmysiambyconn
 from util import mapget,DBWriter
 from dbcount import constructdbgcsv,Parsefilelist_4
 
@@ -28,7 +28,7 @@ def run(filemeta, dbconn, mode=0):
     
     extracteddir = os.path.splitext(os.path.splitext(filelocation)[0])[0]
     fileuid=os.path.basename(extracteddir)
-    createtablebyconn(dbconn,fileuid)
+    createmysiambyconn(dbconn,fileuid)
     if not os.path.exists(extracteddir):
         os.makedirs(extracteddir)
     with tarfile.open(filelocation, "r:gz") as tar:
@@ -40,7 +40,7 @@ def run(filemeta, dbconn, mode=0):
         os.makedirs(traceextraceteddir)
     with tarfile.open(tracelocation, "r:gz") as tar:
         tar.extractall(path=traceextraceteddir,filter='fully_trusted')
-    dbglogsdir = os.path.join(traceextraceteddir, "trace")
+    dbglogsdir = os.path.join(traceextraceteddir, "trace") 
     csvfile_dbg = open(os.path.join(extracteddir, "dbg.csv"), "w", newline="",encoding="utf-8")
     csvwriter_dbg = csv.writer(csvfile_dbg)
     dbg_gz_list =glob.glob(dbglogsdir + "/dbglog*.gz")
@@ -64,9 +64,12 @@ def run(filemeta, dbconn, mode=0):
     #db
     #单独的线程-1
     logger.info("start dbg")
-    sqlsentence=f"insert into dbgitems_{fileuid}  values (null,%s,%s,%s,%s,%s,'{fileuid}')"
-    db_writer = DBWriter(dbconn,sqlsentence,fileuid)
+    sqlsentence=f"insert into dbgitems_{fileuid}  values (%s,%s,%s,%s,%s,%s,null)"
+    database_csv_location=f"{os.path.abspath(extracteddir)}"
+    sqlbyfile="load data concurrent infile '{}' ignore into table dbgitems_{} fields terminated by ',' enclosed by '\"' lines terminated by '\\n' (id,time,errortype,device,info,event) ;"
+    db_writer = DBWriter(dbconn,fileuid,sqlbyload=sqlbyfile,database_csv_location=database_csv_location)
     formatteditems, countlist=Parsefilelist_4(db_writer,dbg_file_list, [fourEqualPattern, fiveDashPattern],mode)
+
     logger.info("dbg analisis finished, dbg file wont open again")
 
 
@@ -118,7 +121,7 @@ def run(filemeta, dbconn, mode=0):
 
 def processfiledbg(clientsocket:socket.socket,dbconn,filemeta):
     run(filemeta,dbconn,0)
-    message=json.dumps({"filelocation":filemeta["filelocation"],"function":"dbg"})
+    message=json.dumps({"filelocation":filemeta["filelocation"],"function":"dbg","state":"success"})
     clientsocket.sendall(message.encode("utf-8"))
 
 def startserver(location):
@@ -138,7 +141,7 @@ def startserver(location):
                     print(jsondata)
                     if "function" in jsondata and jsondata["function"]=="dbg":
                         if "filelocation" in jsondata and os.path.exists(jsondata["filelocation"]):
-                            executor.submit(processfiledbg,client_socket,conn,jsondata)
+                            processfiledbg(client_socket,conn,jsondata)
                     elif "function" in jsondata and jsondata["function"]=="stop":
                         pass
                     elif "function" in jsondata and jsondata["function"]=="start":

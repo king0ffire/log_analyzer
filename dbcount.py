@@ -510,7 +510,7 @@ def lineswithpattern_patternlist_5(database_writer,filename, listoffour):
                     if "-----" in line or "====" in line:
                         matchobj = pattern.search(line)
                         if matchobj:
-                            parts=line.split(" ", 5)
+                            parts=line.strip().split(" ", 5)
                             item=(" ".join(parts[:3]), parts[3], parts[4], parts[5], matchobj.group().split(" ", 1)[1].strip())
                             formatedItems.append(item)
                             batch.append(item)

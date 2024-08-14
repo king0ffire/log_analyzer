@@ -13,8 +13,9 @@ import csv
 import glob
 import sys
 import logging
+from line_profiler import profile
 
-
+@profile
 def run(filelocation, mode=0):
     extracteddir = os.path.splitext(os.path.splitext(filelocation)[0])[0]
     fileuid=os.path.basename(extracteddir)
@@ -33,7 +34,9 @@ def run(filelocation, mode=0):
         global aiosql
         import aiosql
         aiosql.initpool()
-        aiosql.createtablebypool(fileuid)
+        conn=aiosql.pool.get_connection()
+        aiosql.createmysiambyconn(conn,fileuid)
+        aiosql.pool.close_connection(conn)
     sqlinit(fileuid)
     logger = logging.getLogger(__name__)
     logger.info("start logger")
@@ -74,11 +77,13 @@ def run(filelocation, mode=0):
     #db
     #单独的线程-1
     logger.info("start dbg")
-    sqlsentence=f"insert into dbgitems_{fileuid}  values (null,%s,%s,%s,%s,%s,'{fileuid}')"
-    db_writer = DBWriter(aiosql.pool.get_connection(),sqlsentence,fileuid)
+    sqlsentence=f"insert into dbgitems_{fileuid}  values (%s,%s,%s,%s,%s,%s,null)"
+    database_csv_location=f"{os.path.abspath(extracteddir)}"
+    sqlbyfile="load data concurrent infile '{}' ignore into table dbgitems_{} fields terminated by ',' enclosed by '\"' lines terminated by '\\n' (id,time,errortype,device,info,event) ;"
+    db_writer = DBWriter(aiosql.pool.get_connection(),fileuid,sqlbyload=sqlbyfile,database_csv_location=database_csv_location)
     formatteditems, countlist=Parsefilelist_4(db_writer,dbg_file_list, [fourEqualPattern, fiveDashPattern],mode)
-    logger.info("dbg analisis finished, dbg file wont open again")
 
+    logger.info("dbg analisis finished, dbg file wont open again")
 
     #单独的线程- 2<-1
     #cursor=sql.conn.cursor()
@@ -148,17 +153,9 @@ def run(filelocation, mode=0):
         )
         csvwriter_acc.writerows(accinfo)
     logger.info("accounting finished")
-    print("dbg analysis success")
-    aiosql.pool.close_connection(db_writer.close())
-    '''
-    sqltest1=f"insert into dbgitems_{fileuid} values (null,%s,%s,%s,%s,%s,'{fileuid}')"
-    sqltest2=f"insert into dbgitems_{fileuid} value (null,'fasf','afsfds','1r13r1asf','2131fasfsa','1241frgf','{fileuid}')"
-    conn=aiosql.pool.get_connection()
-    cursor=conn.cursor()
-    cursor.execute(sqltest2)
-    cursor.executemany(sqltest1,[("j1l2jk1r","hifhaf","kafhsjafka","klaghi1o","oa2fr8h1fh1")])
-    conn.commit()
-    '''
+    conn=db_writer.close()
+    aiosql.pool.close_connection(conn)
+    print("dbg analysis success")    
     queue_listener.stop()
 
 

@@ -1,5 +1,9 @@
+import csv
+import os
 import queue
 import threading
+from line_profiler import profile
+import aiosql
 
 
 def mapget(map, key):
@@ -8,16 +12,123 @@ def mapget(map, key):
     else:
         return 0
     
+class ThreadEnd(Exception):
+    pass
+    
 class DBWriter:
-    def __init__(self, conn,precompiledsql,fileuid, batch_size=1000):
-        self.batch_size = batch_size
-        self.sql=precompiledsql
-        self.targettable=precompiledsql.split(' ')[2]
+    def __init__(self, conn,fileuid, queue_batch_size=3000,database_batch_size=2,preparedsql=None,sqlbyload=None,database_csv_location=None):
+        self.queue_batch_size=queue_batch_size
+        self.database_batch_size=database_batch_size
+        if preparedsql is not None:
+            self.preparedsql=preparedsql
+            self.targettable=preparedsql.split(' ')[2]
+        elif sqlbyload is not None:
+            self.sqlbyload=sqlbyload
+            self.database_csv_location=database_csv_location
         self.targetfileuid=fileuid
         self.conn=conn
         self.queue = queue.Queue(-1)
-        self.thread = threading.Thread(target=self._db_worker_2, daemon=True)
+        self.thread = threading.Thread(target=self._db_worker_file_2, daemon=True)
+        #aiosql.bulkinsertprep(self.conn)
         self.thread.start()
+    #单文件全部插入
+    def _db_worker_file(self):
+        batch=[]
+        pk=1
+        cursor=self.conn.cursor()
+        database_csvpart_path=os.path.join(self.database_csv_location,f"part.csv")
+        database_csvpart_path = database_csvpart_path.replace("\\","\\\\") 
+        sqlbyload=self.sqlbyload.format(database_csvpart_path,self.targetfileuid)
+        queue_batches=self.database_batch_size
+        with open(database_csvpart_path, 'w', newline='') as csvfile:
+            csvwriter=csv.writer(csvfile)
+            while True:
+                data = self.queue.get()
+                if data is None:
+                    break  # 接收到结束信号，退出线程
+                data=[ [ pk+i,*data] for i,data in enumerate(data)]
+                pk+=len(data)
+                batch.extend(data)
+                if len(batch)>self.queue_batch_size:
+                    csvwriter.writerows(batch)
+                    batch.clear()
+                    queue_batches-=1
+                    if queue_batches==0:
+                        queue_batches=self.database_batch_size
+                        csvfile.flush()
+                        cursor.execute(sqlbyload)
+            if batch:
+                csvwriter.writerows(batch)
+        cursor.execute(sqlbyload)
+
+    #滚动插入
+    def _db_worker_file_2(self):
+        batch=[]
+        pk=1
+        cursor=self.conn.cursor()
+        try:
+            while True:
+                database_csvpart_path=os.path.join(self.database_csv_location,f"part_{pk}.csv")
+                database_csvpart_path = database_csvpart_path.replace("\\","\\\\") 
+                sqlbyload=self.sqlbyload.format(database_csvpart_path,self.targetfileuid)
+                with open(database_csvpart_path, 'w', newline='') as csvfile:
+
+                    csvwriter=csv.writer(csvfile)
+                    data = self.queue.get()
+                    if data is None:
+                        csvwriter.writerows(batch)
+                        raise ThreadEnd()  # 接收到结束信号，退出线程
+                    batch.extend([ [ pk+i,*data] for i,data in enumerate(data)])
+                    pk+=len(data)
+                    try:
+                        while True:
+                            data = self.queue.get(block=False)
+                            if data is None:
+                                csvwriter.writerows(batch)
+                                raise ThreadEnd()  # 接收到结束信号，退出线程
+                            batch.extend([ [ pk+i,*data] for i,data in enumerate(data)])
+                            pk+=len(data)
+                    except queue.Empty:
+                        if len(batch)<self.queue_batch_size:
+                            continue
+                        csvwriter.writerows(batch)
+                batch.clear()
+                print(sqlbyload)
+                cursor.execute(sqlbyload)
+        except ThreadEnd:
+            pass
+        print(sqlbyload)
+        cursor.execute(sqlbyload)
+
+    #阈值插入
+    def _db_worker_file_3(self):
+        batch=[]
+        pk=1
+        cursor=self.conn.cursor()
+        try:
+            while True:
+                database_csvpart_path=os.path.join(self.database_csv_location,f"part_{pk}.csv")
+                database_csvpart_path = database_csvpart_path.replace("\\","\\\\") 
+                sqlbyload=self.sqlbyload.format(database_csvpart_path,self.targetfileuid)
+                with open(database_csvpart_path, 'w', newline='') as csvfile:
+                    csvwriter=csv.writer(csvfile)
+                    while True:
+                        data = self.queue.get()
+                        if data is None:
+                            csvwriter.writerows(batch)
+                            raise ThreadEnd()  # 接收到结束信号，退出线程
+                        batch.extend([ [ pk+i,*data] for i,data in enumerate(data)])
+                        pk+=len(data)
+                        if len(batch)>self.queue_batch_size:
+                            break
+                    csvwriter.writerows(batch)
+                batch.clear()
+                print(sqlbyload)
+                cursor.execute(sqlbyload)
+        except ThreadEnd:
+            pass
+        print(sqlbyload)
+        cursor.execute(sqlbyload)
 
     def _db_worker_2(self):
         batch = []
@@ -44,19 +155,21 @@ class DBWriter:
             
     def _db_worker(self):
         batch = []
+        pk=1
         cursor=self.conn.cursor()
         while True:
             data = self.queue.get()
             if data is None:
                 break  # 接收到结束信号，退出线程
-            batch.extend(data)
+            batch.extend([ [ pk+i,*data] for i,data in enumerate(data)])
+            pk+=len(data)
+            #batch.extend(data)
             if len(batch) >= self.batch_size:  # 当积累到足够的数据量时，进行一次批量写入
-                
-                cursor.executemany(self.sql,batch)
+                cursor.executemany(self.preparedsql,batch)
                 batch.clear()
         # 处理剩余的数据
         if batch:
-            cursor.executemany(self.sql,batch)
+            cursor.executemany(self.preparedsql,batch)
 
     def _db_worker_3(self):
         batch = []
@@ -104,16 +217,15 @@ class DBWriter:
                 sqlmain=",".join(str(item) for item in batch)
                 cursor.execute(sql+sqlmain)
                 batch.clear()
-    def add_data(self, data):
-        """向队列中添加数据"""
-        self.queue.put(data)
 
     def add_batch(self,batch):
         self.queue.put(batch)
+
     def close(self):
         """关闭数据库写入线程"""
-        print(self.queue.qsize())
+        print("queue剩余size:",self.queue.qsize())
         self.queue.put(None)
         self.thread.join()
         self.conn.commit()
+        #aiosql.bulkinsertafter(self.conn)
         return self.conn
