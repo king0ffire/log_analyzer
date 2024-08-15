@@ -93,11 +93,9 @@ class DBWriter:
                             continue
                         csvwriter.writerows(batch)
                 batch.clear()
-                print(sqlbyload)
                 cursor.execute(sqlbyload)
         except ThreadEnd:
             pass
-        print(sqlbyload)
         cursor.execute(sqlbyload)
 
     #阈值插入
@@ -223,7 +221,6 @@ class DBWriter:
 
     def close(self):
         """关闭数据库写入线程"""
-        print("queue剩余size:",self.queue.qsize())
         self.queue.put(None)
         self.thread.join()
         self.conn.commit()
