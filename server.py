@@ -69,7 +69,7 @@ def run(filemeta, dbconn, cachelocation,mode=0):
     logger.info("start dbg")
     sqlsentence=f"insert into dbgitems_{fileuid}  values (%s,%s,%s,%s,%s,%s,null)"
     database_csv_location=f"{os.path.abspath(extracteddir)}"
-    sqlbyfile="load data concurrent infile '{}' ignore into table dbgitems_{} fields terminated by ',' enclosed by '\"' lines terminated by '\\n' (id,time,errortype,device,info,event) ;"
+    sqlbyfile="load data concurrent infile '{}' ignore into table dbgitems_{} fields terminated by ',' enclosed by '\"' lines terminated by '\\r\\n' (id,time,errortype,device,info,event) ;"
     db_writer = DBWriter(dbconn,fileuid,sqlbyload=sqlbyfile,database_csv_location=database_csv_location)
     formatteditems, countlist=Parsefilelist_4(db_writer,dbg_file_list, [fourEqualPattern, fiveDashPattern],mode)
 
