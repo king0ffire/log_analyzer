@@ -1,9 +1,6 @@
-from ast import dump
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 import csv
-from email import message
-from functools import cache
 import glob
 import gzip
 import os
@@ -14,20 +11,14 @@ import sys
 import tarfile
 import json
 import time
-from venv import logger
 from line_profiler import profile
+import configparser
 
-
-from aiosql import Mypool, createmysiambyconn
-from util import mapget,DBWriter
-from dbcount import constructdbgcsv,Parsefilelist_4
 
 @profile
 def run(filemeta, dbconn, cachelocation,mode=0):
     fileuid=filemeta["fileuid"]
     filelocation=os.path.join(cachelocation,fileuid+".tar.gz")
-    logger = logging.getLogger(__name__)
-
     
     extracteddir = os.path.splitext(os.path.splitext(filelocation)[0])[0]
     fileuid=os.path.basename(extracteddir)
@@ -57,9 +48,9 @@ def run(filemeta, dbconn, cachelocation,mode=0):
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
 
-    fourEqualPattern = r"====[^\[]*"
+    fourEqualPattern = config["python"]["fourEqualPattern"]
     #fourEqualPattern = r"====.*?\["
-    fiveDashPattern = r"-----[^-\[\n]+"
+    fiveDashPattern = config["python"]["fiveDashPattern"]
     #pattern1 = r"[X2AP]:Sending UE CONTEXT RELEASE"
     #pattern2 = r"Received HANDOVER REQUEST"
 
@@ -125,6 +116,7 @@ def run(filemeta, dbconn, cachelocation,mode=0):
     sys.stdout.flush()
 
 def processfiledbg(clientsocket:socket.socket,dbconn,filemeta,cachelocation):
+
     try:
         run(filemeta,dbconn,cachelocation,0)
         message=json.dumps({"useruid":filemeta["useruid"],"fileuid":filemeta["fileuid"],"function":"dbg","state":"success"})
@@ -134,7 +126,7 @@ def processfiledbg(clientsocket:socket.socket,dbconn,filemeta,cachelocation):
     clientsocket.sendall(message.encode("utf-8"))
 
 def parsejsondata(client_socket,jsondata,conn,cachelocation):
-    logger=logging.getLogger(__name__)
+
     logger.debug(f"currrent jsondata:{repr(jsondata)}")
 
     if "function" in jsondata and jsondata["function"]=="Dbg":
@@ -147,15 +139,13 @@ def parsejsondata(client_socket,jsondata,conn,cachelocation):
     else:
         client_socket.send(b"{fileuid}:error")
 def startserver(cachelocation):
-    queue_listener = configure_logger(cachelocation)
-    logger=logging.getLogger(__name__)
-    queue_listener.start()
+
     logger.info("Current Working Directory: %s", os.getcwd())
     logger.info("Current File Dirctory: %s", os.path.abspath("."))
-    mypool=Mypool(1)
-    conn=mypool.get_connection()
+    mypool=DatabaseConnectionPool(1)
+
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("127.0.0.1", 9091))
+    s.bind((config["socket"]["host"], int(config["socket"]["port"])))
     s.listen(5)
     logger.info("server started to listen")
     with ThreadPoolExecutor() as executor:
@@ -165,7 +155,10 @@ def startserver(cachelocation):
                 logger.info(f"{addr} connected")
                 buffer=""
                 while True:
-                    jsondumps=client_socket.recv(1024).decode()
+                    bytedump=client_socket.recv(1024)
+                    if not bytedump:
+                        raise Exception("Empty data received, close current socket")
+                    jsondumps=bytedump.decode()
                     buffer+=jsondumps
                     logger.debug(f"received from client:{repr(jsondumps)}")
                     logger.debug(f"current buffer:{repr(buffer)}")
@@ -174,13 +167,14 @@ def startserver(cachelocation):
                         jsondump,buffer=buffer.split("\n",1)
                         logger.debug(f"current jsondump:{repr(jsondump)}")
                         jsondata=json.loads(jsondump)
+                        conn=mypool.get_connection()
                         parsejsondata(client_socket,jsondata,conn,cachelocation)
+                        mypool.close_connection(conn)
                         end_time=time.time()
                         logger.debug(f"file {jsondata['fileuid']} cost:{(end_time-starttime):.4f}")
                     logger.debug(f"remaining buffer before next packet:{repr(buffer)}")
             except Exception as e:
                 logger.warning(f"connection lost:{e}")
-                    
 def configure_logger(location):
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
@@ -200,4 +194,12 @@ def configure_logger(location):
             
             
 if __name__ == "__main__":
-    startserver(sys.argv[1])
+    config=configparser.ConfigParser()
+    config.read("config.ini")
+    queue_listener = configure_logger(config["file"]["cache_path"])
+    queue_listener.start()
+    logger=logging.getLogger(__name__)
+    from aiosql import DatabaseConnectionPool, createmysiambyconn
+    from util import mapget,DBWriter
+    from dbcount import constructdbgcsv,Parsefilelist_4
+    startserver(config["file"]["cache_path"])

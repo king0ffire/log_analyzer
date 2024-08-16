@@ -1,11 +1,11 @@
 import csv
+import logging
 import os
 import queue
 import threading
 from line_profiler import profile
-import aiosql
 
-
+logger=logging.getLogger(__name__)
 def mapget(map, key):
     if key in map:
         return map[key]
