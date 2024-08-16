@@ -167,7 +167,7 @@ def processfiledbg(clientsocket: socket.socket, dbpool, filemetajson, cachelocat
 
 def parsejsondata(
     task_status: dict,
-    dbgTaskListener: QueueListener,
+    dbgTaskListener: 'QueueListener',
     client_socket,
     filemetajson: dict,
     dbpool,
@@ -179,7 +179,7 @@ def parsejsondata(
             filemetajson["fileuid"] in task_status
             and filemetajson["function"][5:] == "Dbg"
         ):
-            task_status[filemetajson["fileuid"]]["state"] = "canceled"
+            del task_status[filemetajson["fileuid"]]
             logger.info(f"{filemetajson['fileuid']}:dbg analysis canceled")
     elif filemetajson["function"] == "Dbg":
         filemetajson["state"] = "pending"
@@ -197,7 +197,7 @@ def startserver(cachelocation):
     task_status = {}
     logger.info("Current Working Directory: %s", os.getcwd())
     logger.info("Current File Dirctory: %s", os.path.abspath("."))
-    mypool = DatabaseConnectionPool(config["python"]["pool_size"])
+    mypool = DatabaseConnectionPool(int(config["python"]["pool_size"]))
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((config["socket"]["host"], int(config["socket"]["port"])))
@@ -266,5 +266,9 @@ if __name__ == "__main__":
     from aiosql import DatabaseConnectionPool, createmysiambyconn
     from util import mapget, DBWriter, QueueListener
     from dbcount import constructdbgcsv, Parsefilelist_4
-
-    startserver(config["file"]["cache_path"])
+    try:
+        startserver(config["file"]["cache_path"])
+    except Exception as e:
+        logger.critical("server error:")
+    finally:
+        queue_listener.stop()

@@ -241,13 +241,13 @@ class QueueListener:
         has_task_done = hasattr(self.queue, 'task_done')
         while True:
                 args = self.queue.get(True)
-                if args[0] is None:
+                if args is None:
                     if has_task_done:
                         self.queue.task_done()
                         break
                 for handler in self.handlers:
                     try:
-                        handler(args)
+                        handler(*args)
                     except Exception as e:
                         logger.error(f"Error when running handler: {e}")
                 if has_task_done:

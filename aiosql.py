@@ -8,7 +8,7 @@ config=configparser.ConfigParser()
 config.read("config.ini")
 
 class DatabaseConnectionPool:
-    def __init__(self,pool_size=int(config["python"]["pool_size"])):
+    def __init__(self,pool_size=12):
         self.pool=queue.Queue(pool_size)
         logger.info("start sql")
 
