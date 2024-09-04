@@ -305,7 +305,7 @@ def configure_logger(location):
 
 if __name__ == "__main__":
     config = configparser.ConfigParser()
-    config.read("config.ini")
+    config.read("../config.ini")
     queue_listener = configure_logger(config["file"]["cache_path"])
     queue_listener.start()
     logger = logging.getLogger(__name__)
