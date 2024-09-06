@@ -25,12 +25,12 @@ def run(filelocation, mode=0):
     queue_listener = configure_logger(extracteddir)
     queue_listener.start()
 
-    from util import mapget
-    from dbcount import constructdbgcsv,Parsefile,Parsefilelist_2
+    from core.task_queue import mapget
+    from dbglog import constructdbgcsv,Parsefile,Parsefilelist_2
 
     def sqlinit(fileuid):
-        global sql
-        import sql
+        global deprecated.sql
+        import deprecated.sql as sql
         sql.init()
         sql.createtable(fileuid)
     with ThreadPoolExecutor() as executor:
@@ -88,7 +88,7 @@ def run(filelocation, mode=0):
     #cursor.executemany(sqlsentence,formatteditems)
 
     #单独的线程- 2<-1
-    from category import get_tagfromcsv
+    from core.category import get_tagfromcsv
     countmap=Counter([tup[4] for tup in formatteditems])
     #categories = get_category(os.path.join(os.path.dirname(sys.argv[0]), r"dbg信令分类_唯一分类.xlsx"))
     tags=get_tagfromcsv(os.path.join(os.path.dirname(sys.argv[0]), r"dbg信令分类_唯一分类.csv")) # not including non-categorized

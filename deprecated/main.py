@@ -39,7 +39,7 @@ def CategoryCount():
 '''    
 
 def sctpanalysis(csvfile_id,csvwriter_id, sctp_file_list,cache_path,filter1,filter2, mode=0):
-    from ids_pyshark import pcapInfoToListBy2Filters, process_one_file_by2filters
+    from sctp import pcapInfoToListBy2Filters, process_one_file_by2filters
     logger=logging.getLogger(__name__)
     logger.info("sctp started")
     csvwriter_id.writerow(
@@ -128,8 +128,8 @@ def run(filelocation, mode=0):
     queue_listener.start()
 
 
-    from util import Parsefilelist
-    import sql
+    from core.task_queue import Parsefilelist
+    import deprecated.sql as sql
     executor_0=ThreadPoolExecutor() 
     executor_0.submit(sql.init,fileuid)
         
@@ -186,7 +186,7 @@ def run(filelocation, mode=0):
     executor.submit(cursor.executemany,sqlsentence,formatteditems)
     
     #单独的线程- 2<-1
-    from category import get_category,get_tag
+    from core.category import get_category,get_tag
     countmap=Counter([tup[4] for tup in formatteditems])
     categories = get_category(os.path.join(os.path.dirname(sys.argv[0]), "dbg信令分类_唯一分类.xlsx"))
     tags=get_tag(countmap, categories)

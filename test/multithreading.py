@@ -1,5 +1,5 @@
-from ids_pyshark import process_one_file_by2filters,pcapInfoToListBy2Filters
-from dbcount import counter_FileListby2patterns, ParseFiles_2
+from sctp import process_one_file_by2filters,pcapInfoToListBy2Filters
+from dbglog import counter_FileListby2patterns, ParseFiles_2
 import os
 import tarfile
 import csv

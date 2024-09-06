@@ -82,7 +82,7 @@ if __name__ == "__main__":
     logger.info("start logger")
     logger.info("Current Working Directory: %s", os.getcwd())
     logger.info("Current File Dirctory: %s", os.path.abspath("."))
-    from ids_pyshark import sctpanalysis
+    from core.sctp import sctpanalysis
     
     run(sys.argv[1], mode=int(sys.argv[2]))
     

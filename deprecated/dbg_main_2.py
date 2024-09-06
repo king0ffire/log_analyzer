@@ -31,12 +31,12 @@ def run(filelocation, mode=0):
     queue_listener = configure_logger(extracteddir)
     queue_listener.start()
 
-    from util import mapget,DBWriter
-    from dbcount import constructdbgcsv,Parsefilelist_4
+    from core.task_queue import mapget,DBWriter
+    from dbglog import constructdbgcsv,Parsefilelist_4
 
     def sqlinit(fileuid):
-        global aiosql
-        import aiosql
+        global dataaccess.aiosql
+        import dataaccess.aiosql as aiosql
         aiosql.initpool()
         conn=aiosql.pool.get_connection()
         aiosql.createmysiambyconn(conn,fileuid)
@@ -115,7 +115,7 @@ def run(filelocation, mode=0):
     '''
 
     #单独的线程- 2<-1
-    from category import get_tagfromcsv
+    from core.category import get_tagfromcsv
     countmap=Counter([tup[4] for tup in formatteditems])
     #categories = get_category(os.path.join(os.path.dirname(sys.argv[0]), r"dbg信令分类_唯一分类.xlsx"))
     tags=get_tagfromcsv(os.path.join(os.path.dirname(sys.argv[0]), r"dbg信令分类_唯一分类.csv")) # not including non-categorized

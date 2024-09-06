@@ -1,6 +1,6 @@
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from ids_pyshark import pcapInfoToListBy2Filters
-from dbcount import counter_FileListby2patterns
+from sctp import pcapInfoToListBy2Filters
+from dbglog import counter_FileListby2patterns
 import os
 import tarfile
 import csv
